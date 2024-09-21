@@ -21,7 +21,10 @@ class ApiClient {
       final result = json.decode(response.body);
       print('GET $endpoint: $result');
       return result;
-    } else {
+    } else if (response.statusCode == 401 && jwtToken != null) {
+      throw Exception('Unauthorized');
+    }
+    else {
       throw Exception('Failed to load data');
     }
   }

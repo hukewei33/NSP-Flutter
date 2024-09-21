@@ -3,7 +3,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'api_client.dart';
 import 'home_screen.dart';
 
-
 enum LoginState {
   loggedIn,
   loggedOut,
@@ -13,7 +12,6 @@ class LoginScreen extends StatefulWidget {
   @override
   _LoginScreenState createState() => _LoginScreenState();
 }
-
 
 class _LoginScreenState extends State<LoginScreen> {
   final ApiClient apiClient = ApiClient(baseUrl: 'https://boiling-escarpment-47456-9ae4c3f34de1.herokuapp.com');
@@ -38,26 +36,48 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _attemptAutoLogin(String token) async {
     try {
       final response = await apiClient.get('/api/hello', jwtToken: token);
-      if (response['msg'] == 'world') {
+      if (response != null && response['msg'] == 'world') {
         setState(() {
           _loginState = LoginState.loggedIn;
         });
         _navigateToHome();
+      } else {
+        tryStoredCredentialsLogin();
       }
     } catch (e) {
-      print(e);
+      print('Error during auto-login: $e');
+      tryStoredCredentialsLogin();
+    }
+  }
+
+  Future<void> tryStoredCredentialsLogin() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? username = prefs.getString('username');
+    String? password = prefs.getString('password');
+    if (username != null && password != null) {
+      _usernameController.text = username;
+      _passwordController.text = password;
+      await _performLogin(username, password);
     }
   }
 
   Future<void> _login() async {
+    String username = _usernameController.text;
+    String password = _passwordController.text;
+    await _performLogin(username, password);
+  }
+
+  Future<void> _performLogin(String username, String password) async {
     try {
       final response = await apiClient.post('/api/login', {
-        'username': _usernameController.text,
-        'password': _passwordController.text,
+        'username': username,
+        'password': password,
       });
-      if (response['token'] != null) {
+      if (response != null && response['token'] != null) {
         SharedPreferences prefs = await SharedPreferences.getInstance();
         prefs.setString('token', response['token']);
+        prefs.setString('username', username);
+        prefs.setString('password', password);
         setState(() {
           _loginState = LoginState.loggedIn;
         });
@@ -66,6 +86,7 @@ class _LoginScreenState extends State<LoginScreen> {
         _showError('Invalid username or password');
       }
     } catch (e) {
+      print('Error during login: $e');
       _showError('Failed to login');
     }
   }
