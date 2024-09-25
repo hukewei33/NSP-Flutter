@@ -185,7 +185,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           spacing: 8.0,
                            children: currentNode!.edges!.map((edge) {
                             if (edge.child != null) {
-                              return _buildStoryNode(edge.child!, onTouched: () => _traverseEdge(edge));
+                              return _buildStoryNode(edge.child!, onTouched: () => _traverseEdge(edge), color:edge.metadata!.contains('caution') ? Color.fromARGB(255, 82, 152, 185) : Color.fromARGB(255, 197, 97, 97));
                             } else {
                               return _buildStoryNode(
                                 Node(description: 'Missing child node'),
@@ -199,14 +199,14 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildStoryNode(Node node, {VoidCallback? onTouched}) {
+  Widget _buildStoryNode(Node node, {VoidCallback? onTouched, Color? color}) {
     return GestureDetector(
       onTap: onTouched,
       child: Container(
         margin: EdgeInsets.symmetric(vertical: 8.0),
         padding: EdgeInsets.all(12.0),
         decoration: BoxDecoration(
-          color: onTouched != null ? Colors.lightBlue[50] : Colors.grey[200],
+          color: color ?? (onTouched != null ? Colors.lightBlue[50] : Colors.grey[200]),
           borderRadius: BorderRadius.circular(8.0),
         ),
         child: Column(
