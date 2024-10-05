@@ -11,15 +11,18 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final ApiClient apiClient = ApiClient(baseUrl: 'https://boiling-escarpment-47456-9ae4c3f34de1.herokuapp.com');
+  final ApiClient apiClient = ApiClient(
+      baseUrl: 'https://boiling-escarpment-47456-9ae4c3f34de1.herokuapp.com');
 
   List<Node> visitedNodes = [];
   Node? currentNode;
   bool isLoading = false;
+  bool storyEnded = false;
 
   Future<void> _startStory(BuildContext context) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? authToken = prefs.getString('token'); // Retrieve token using the key 'token'
+    String? authToken =
+        prefs.getString('token'); // Retrieve token using the key 'token'
 
     if (authToken != null) {
       setState(() {
@@ -27,7 +30,8 @@ class _HomeScreenState extends State<HomeScreen> {
         visitedNodes.clear();
       });
       try {
-        final response = await apiClient.get('/api/randomstory', jwtToken: authToken);
+        final response =
+            await apiClient.get('/api/randomstory', jwtToken: authToken);
 
         final Node story = Node.fromJson(response["result"]);
         setState(() {
@@ -35,7 +39,7 @@ class _HomeScreenState extends State<HomeScreen> {
           visitedNodes.add(story);
           isLoading = false;
         });
-            } catch (e) {
+      } catch (e) {
         if (e.toString().contains('Unauthorized')) {
           print('Unauthorized or token expired');
           Navigator.pushReplacement(
@@ -79,22 +83,19 @@ class _HomeScreenState extends State<HomeScreen> {
     String result;
     Node? actionNode = edge.child;
     List<Edge>? actionResultEdges = actionNode?.edges;
-    Node? nextNode;
+    Edge? nextEdge;
     if (roll == 0) {
       result = 'The action failed.';
-      nextNode = actionResultEdges?.firstWhere((edge) => edge.metadata?.contains('failed') == true).child;
-      // Determine nextNode based on action failure
-      // nextNode = edge.child; // Assign the appropriate node
+      nextEdge = actionResultEdges
+          ?.firstWhere((edge) => edge.metadata?.contains('failed') == true);
     } else if (roll == 1) {
       result = 'The action was so-so.';
-      nextNode = actionResultEdges?.firstWhere((edge) => edge.metadata?.contains('ok') == true).child;
-      // Determine nextNode based on action okay
-      // nextNode = edge.child; // Assign the appropriate node
+      nextEdge = actionResultEdges
+          ?.firstWhere((edge) => edge.metadata?.contains('ok') == true);
     } else {
       result = 'The action succeeded!';
-      nextNode = actionResultEdges?.firstWhere((edge) => edge.metadata?.contains('success') == true).child;
-      // Determine nextNode based on action success
-      // nextNode = edge.child; // Assign the appropriate node
+      nextEdge = actionResultEdges
+          ?.firstWhere((edge) => edge.metadata?.contains('success') == true);
     }
 
     // Show the result dialog
@@ -107,14 +108,8 @@ class _HomeScreenState extends State<HomeScreen> {
           actions: [
             TextButton(
               onPressed: () {
-                 Navigator.of(context).pop();
-                if (nextNode == null) {
-                  return;
-                }
-                setState(() {
-                  currentNode = nextNode;
-                  visitedNodes.add(nextNode!);
-                });
+                Navigator.of(context).pop();
+                _traverseEdge(nextEdge!);
               },
               child: Text('Continue'),
             ),
@@ -131,6 +126,22 @@ class _HomeScreenState extends State<HomeScreen> {
       if (edge.metadata?.contains('Action') == true) {
         _showDiceRollDialog(edge);
       }
+      if (edge.metadata?.contains('Ending') == true) {
+        setState(() {
+          storyEnded = true;
+        });
+      }
+      if (edge.metadata?.contains('Event') == true &&
+          edge.child != null &&
+          edge.child!.edges != null &&
+          edge.child!.edges!.isNotEmpty &&
+          edge.child!.edges!
+              .every((edge) => edge.metadata?.contains('Ending') == true)) {
+        setState(() {
+          _traverseEdge(edge.child!.edges!
+              .firstWhere((edge) => edge.metadata?.contains('Ending') == true));
+        });
+      }
     });
   }
 
@@ -138,6 +149,7 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       currentNode = null;
       visitedNodes.clear();
+      storyEnded = false;
     });
     _startStory(context);
   }
@@ -176,12 +188,17 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       if (currentNode?.edges != null &&
                           currentNode!.edges!.isNotEmpty &&
-                          currentNode!.edges!.every((edge) => edge.metadata?.contains('Action') == true))
+                          currentNode!.edges!.every((edge) =>
+                              edge.metadata?.contains('Action') == true))
                         Wrap(
                           spacing: 8.0,
-                           children: currentNode!.edges!.map((edge) {
+                          children: currentNode!.edges!.map((edge) {
                             if (edge.child != null) {
-                              return _buildStoryNode(edge.child!, onTouched: () => _traverseEdge(edge), color:edge.metadata!.contains('caution') ? Color.fromARGB(255, 82, 152, 185) : Color.fromARGB(255, 197, 97, 97));
+                              return _buildStoryNode(edge.child!,
+                                  onTouched: () => _traverseEdge(edge),
+                                  color: edge.metadata!.contains('caution')
+                                      ? Color.fromARGB(255, 82, 152, 185)
+                                      : Color.fromARGB(255, 197, 97, 97));
                             } else {
                               return _buildStoryNode(
                                 Node(description: 'Missing child node'),
@@ -189,6 +206,10 @@ class _HomeScreenState extends State<HomeScreen> {
                             }
                           }).toList(),
                         ),
+                      if (storyEnded)
+                        ElevatedButton(
+                            onPressed: () => _restartStory(context),
+                            child: Text('Story Ended, Restart Story'))
                     ],
                   ),
       ),
@@ -202,7 +223,8 @@ class _HomeScreenState extends State<HomeScreen> {
         margin: EdgeInsets.symmetric(vertical: 8.0),
         padding: EdgeInsets.all(12.0),
         decoration: BoxDecoration(
-          color: color ?? (onTouched != null ? Colors.lightBlue[50] : Colors.grey[200]),
+          color: color ??
+              (onTouched != null ? Colors.lightBlue[50] : Colors.grey[200]),
           borderRadius: BorderRadius.circular(8.0),
         ),
         child: Column(

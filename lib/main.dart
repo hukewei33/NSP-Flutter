@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:nsp_mobile/login_screen.dart';
+import 'package:nsp_mobile/landing_screen.dart';
 
 void main() {
   runApp(MyApp());
@@ -13,7 +13,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: LoginScreen(),
+      home: LandingScreen(),
     );
   }
 }

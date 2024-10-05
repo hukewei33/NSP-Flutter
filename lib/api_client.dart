@@ -22,7 +22,7 @@ class ApiClient {
     if (response.statusCode == 200) {
       final result = json.decode(response.body);
       print('GET $endpoint: $result');
-      return result;
+      return {...result, 'statusCode': response.statusCode};
     } else if (response.statusCode == 401 && jwtToken != null) {
       bool retryAtempt = await tryStoredCredentialsLogin();
       if (retryAtempt) {
@@ -42,6 +42,11 @@ class ApiClient {
     if (username != null && password != null) {
       return false;
     }
+    bool loginResults = await tryLogin(username!, password!);
+    return loginResults;
+  }
+
+  Future<bool> tryLogin(String username, String password) async {
     try {
       final response = await post('/api/login', {
         'username': username,
@@ -73,9 +78,10 @@ class ApiClient {
     if (response.statusCode == 200) {
       final result = json.decode(response.body);
       print('POST $endpoint: $result');
-      return result;
+      return {...result, 'statusCode': response.statusCode};
     } else {
       throw Exception('Failed to post data');
     }
   }
+
 }

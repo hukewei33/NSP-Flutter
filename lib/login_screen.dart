@@ -68,27 +68,41 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _performLogin(String username, String password) async {
-    try {
-      final response = await apiClient.post('/api/login', {
-        'username': username,
-        'password': password,
+    bool loginResults = await apiClient.tryLogin(username, password);
+    if (loginResults) {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      prefs.setString('username', username);
+      prefs.setString('password', password);
+      setState(() {
+        _loginState = LoginState.loggedIn;
       });
-      if (response['token'] != null) {
-        SharedPreferences prefs = await SharedPreferences.getInstance();
-        prefs.setString('token', response['token']);
-        prefs.setString('username', username);
-        prefs.setString('password', password);
-        setState(() {
-          _loginState = LoginState.loggedIn;
-        });
-        _navigateToHome();
-      } else {
-        _showError('Invalid username or password');
-      }
-    } catch (e) {
-      print('Error during login: $e');
-      _showError('Failed to login');
+      _navigateToHome();
+      return;
+    } else {
+      _showError('Invalid username or password');
+      return;
     }
+    // try {
+    //   final response = await apiClient.post('/api/login', {
+    //     'username': username,
+    //     'password': password,
+    //   });
+    //   if (response['token'] != null) {
+    //     SharedPreferences prefs = await SharedPreferences.getInstance();
+    //     prefs.setString('token', response['token']);
+    //     prefs.setString('username', username);
+    //     prefs.setString('password', password);
+    //     setState(() {
+    //       _loginState = LoginState.loggedIn;
+    //     });
+    //     _navigateToHome();
+    //   } else {
+    //     _showError('Invalid username or password');
+    //   }
+    // } catch (e) {
+    //   print('Error during login: $e');
+    //   _showError('Failed to login');
+    // }
   }
 
   void _showError(String message) {
