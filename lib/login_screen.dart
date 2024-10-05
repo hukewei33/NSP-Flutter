@@ -36,7 +36,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _attemptAutoLogin(String token) async {
     try {
       final response = await apiClient.get('/api/hello', jwtToken: token);
-      if (response != null && response['msg'] == 'world') {
+      if (response['msg'] == 'world') {
         setState(() {
           _loginState = LoginState.loggedIn;
         });
@@ -73,7 +73,7 @@ class _LoginScreenState extends State<LoginScreen> {
         'username': username,
         'password': password,
       });
-      if (response != null && response['token'] != null) {
+      if (response['token'] != null) {
         SharedPreferences prefs = await SharedPreferences.getInstance();
         prefs.setString('token', response['token']);
         prefs.setString('username', username);

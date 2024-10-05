@@ -47,7 +47,7 @@ class ApiClient {
         'username': username,
         'password': password,
       });
-      if (response != null && response['token'] != null) {
+      if (response['token'] != null) {
         SharedPreferences prefs = await SharedPreferences.getInstance();
         prefs.setString('token', response['token']);
         return true;

@@ -29,17 +29,13 @@ class _HomeScreenState extends State<HomeScreen> {
       try {
         final response = await apiClient.get('/api/randomstory', jwtToken: authToken);
 
-        if (response != null) {
-          final Node story = Node.fromJson(response["result"]);
-          setState(() {
-            currentNode = story;
-            visitedNodes.add(story);
-            isLoading = false;
-          });
-        } else {
-          print('Failed to start story');
-        }
-      } catch (e) {
+        final Node story = Node.fromJson(response["result"]);
+        setState(() {
+          currentNode = story;
+          visitedNodes.add(story);
+          isLoading = false;
+        });
+            } catch (e) {
         if (e.toString().contains('Unauthorized')) {
           print('Unauthorized or token expired');
           Navigator.pushReplacement(
