@@ -30,8 +30,9 @@ class Node {
   String? id;
   String? description;
   List<Edge>? edges;
+  String? outcome;
 
-  Node({this.id, this.description, this.edges});
+  Node({this.id, this.description, this.edges, this.outcome});
 
   // Factory method to create a Node from JSON
   factory Node.fromJson(Map<String, dynamic> json) {
@@ -41,6 +42,7 @@ class Node {
       edges: json['edges'] != null
           ? List<Edge>.from(json['edges'].map((e) => Edge.fromJson(e)))
           : null,
+          outcome: json['outcome'],
     );
   }
 
@@ -51,6 +53,9 @@ class Node {
     data['description'] = description;
     if (edges != null) {
       data['edges'] = edges!.map((e) => e.toJson()).toList();
+    }
+    if (outcome != null) {
+      data['outcome'] = outcome;
     }
     return data;
   }

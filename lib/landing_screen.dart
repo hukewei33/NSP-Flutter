@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nsp_mobile/fortune_wheel.dart';
 import 'package:uuid/uuid.dart';
 import 'api_client.dart';
 import 'login_screen.dart';
@@ -6,8 +7,29 @@ import 'home_screen.dart';
 import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class LandingScreen extends StatelessWidget {
+class LandingScreen extends StatefulWidget {
+  @override
+  _LandingScreenState createState() => _LandingScreenState();
+}
+
+class _LandingScreenState extends State<LandingScreen> {
   final ApiClient apiClient = ApiClient(baseUrl: 'https://boiling-escarpment-47456-9ae4c3f34de1.herokuapp.com');
+
+  @override
+  void initState() {
+    super.initState();
+    _attemptStoredCredentialsLogin();
+  }
+  Future<void> _attemptStoredCredentialsLogin() async {
+    bool loginSuccessful = await apiClient.tryStoredCredentialsLogin();
+    print(loginSuccessful);
+    if (loginSuccessful) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => HomeScreen()),
+      );
+    }
+  }
 
   void _continueAsGuest(BuildContext context) async {
     // Generate random credentials
@@ -65,9 +87,6 @@ class LandingScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Welcome'),
-      ),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

@@ -40,6 +40,7 @@ class ApiClient {
     String? username = prefs.getString('username');
     String? password = prefs.getString('password');
     if (username != null && password != null) {
+      print('Found no stored credentials');
       return false;
     }
     bool loginResults = await tryLogin(username!, password!);
