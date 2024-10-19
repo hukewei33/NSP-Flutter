@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nsp_mobile/fortune_wheel.dart';
 import 'package:nsp_mobile/login_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_client.dart';
@@ -11,15 +12,20 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final ApiClient apiClient = ApiClient(baseUrl: 'https://boiling-escarpment-47456-9ae4c3f34de1.herokuapp.com');
+  final ApiClient apiClient = ApiClient(
+      baseUrl: 'https://boiling-escarpment-47456-9ae4c3f34de1.herokuapp.com');
 
   List<Node> visitedNodes = [];
   Node? currentNode;
   bool isLoading = false;
+  bool storyEnded = false;
+  bool isRolling = false;
+  SpinResult spinResult = SpinResult.draw;
 
   Future<void> _startStory(BuildContext context) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? authToken = prefs.getString('token'); // Retrieve token using the key 'token'
+    String? authToken =
+        prefs.getString('token'); // Retrieve token using the key 'token'
 
     if (authToken != null) {
       setState(() {
@@ -27,18 +33,15 @@ class _HomeScreenState extends State<HomeScreen> {
         visitedNodes.clear();
       });
       try {
-        final response = await apiClient.get('/api/randomstory', jwtToken: authToken);
+        final response =
+            await apiClient.get('/api/randomstory', jwtToken: authToken);
 
-        if (response != null) {
-          final Node story = Node.fromJson(response["result"]);
-          setState(() {
-            currentNode = story;
-            visitedNodes.add(story);
-            isLoading = false;
-          });
-        } else {
-          print('Failed to start story');
-        }
+        final Node story = Node.fromJson(response["result"]);
+        setState(() {
+          currentNode = story;
+          visitedNodes.add(story);
+          isLoading = false;
+        });
       } catch (e) {
         if (e.toString().contains('Unauthorized')) {
           print('Unauthorized or token expired');
@@ -59,23 +62,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showDiceRollDialog(Edge edge) async {
-    // Show the dialog
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Rolling the Dice'),
-          content: Text('Determining the outcome...'),
-        );
-      },
-    );
-
-    // Simulate a delay for the dice roll
-    await Future.delayed(Duration(seconds: 2));
-
-    // Dismiss the dialog
-    Navigator.of(context).pop();
-
     // Determine the result of the dice roll
     Random random = Random();
     int roll = random.nextInt(3); // 0: fail, 1: okay, 2: succeed
@@ -83,49 +69,42 @@ class _HomeScreenState extends State<HomeScreen> {
     String result;
     Node? actionNode = edge.child;
     List<Edge>? actionResultEdges = actionNode?.edges;
-    Node? nextNode;
+    Edge? nextEdge;
+    SpinResult newSpinResult;
+    Node? outcomeNode;
     if (roll == 0) {
       result = 'The action failed.';
-      nextNode = actionResultEdges?.firstWhere((edge) => edge.metadata?.contains('failed') == true).child;
-      // Determine nextNode based on action failure
-      // nextNode = edge.child; // Assign the appropriate node
+      nextEdge = actionResultEdges
+          ?.firstWhere((edge) => edge.metadata?.contains('failed') == true);
+      newSpinResult = SpinResult.lose;
+      outcomeNode =
+          Node(description: "You failed the action.", outcome: "failed");
     } else if (roll == 1) {
       result = 'The action was so-so.';
-      nextNode = actionResultEdges?.firstWhere((edge) => edge.metadata?.contains('ok') == true).child;
-      // Determine nextNode based on action okay
-      // nextNode = edge.child; // Assign the appropriate node
+      nextEdge = actionResultEdges
+          ?.firstWhere((edge) => edge.metadata?.contains('ok') == true);
+      newSpinResult = SpinResult.draw;
+      outcomeNode =
+          Node(description: "You didn't sucees the action, but you did't fail either.", outcome: "ok");
     } else {
       result = 'The action succeeded!';
-      nextNode = actionResultEdges?.firstWhere((edge) => edge.metadata?.contains('success') == true).child;
-      // Determine nextNode based on action success
-      // nextNode = edge.child; // Assign the appropriate node
+      nextEdge = actionResultEdges
+          ?.firstWhere((edge) => edge.metadata?.contains('success') == true);
+      newSpinResult = SpinResult.win;
+      outcomeNode =
+          Node(description: "You succeeded the action.", outcome: "success");
     }
 
-    // Show the result dialog
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Dice Roll Result'),
-          content: Text(result),
-          actions: [
-            TextButton(
-              onPressed: () {
-                 Navigator.of(context).pop();
-                if (nextNode == null) {
-                  return;
-                }
-                setState(() {
-                  currentNode = nextNode;
-                  visitedNodes.add(nextNode!);
-                });
-              },
-              child: Text('Continue'),
-            ),
-          ],
-        );
-      },
-    );
+    setState(() {
+      isRolling = true;
+      spinResult = newSpinResult;
+    });
+    await Future.delayed(Duration(seconds: 5));
+    setState(() {
+      isRolling = false;
+      visitedNodes.add(outcomeNode!);
+    });
+    _traverseEdge(nextEdge!);
   }
 
   void _traverseEdge(Edge edge) {
@@ -135,6 +114,22 @@ class _HomeScreenState extends State<HomeScreen> {
       if (edge.metadata?.contains('Action') == true) {
         _showDiceRollDialog(edge);
       }
+      if (edge.metadata?.contains('Ending') == true) {
+        setState(() {
+          storyEnded = true;
+        });
+      }
+      if (edge.metadata?.contains('Event') == true &&
+          edge.child != null &&
+          edge.child!.edges != null &&
+          edge.child!.edges!.isNotEmpty &&
+          edge.child!.edges!
+              .every((edge) => edge.metadata?.contains('Ending') == true)) {
+        setState(() {
+          _traverseEdge(edge.child!.edges!
+              .firstWhere((edge) => edge.metadata?.contains('Ending') == true));
+        });
+      }
     });
   }
 
@@ -142,6 +137,7 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       currentNode = null;
       visitedNodes.clear();
+      storyEnded = false;
     });
     _startStory(context);
   }
@@ -150,7 +146,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Home'),
+        title: Text('Adventure'),
         actions: [
           IconButton(
             icon: Icon(Icons.refresh),
@@ -159,60 +155,109 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: Center(
-        child: isLoading
-            ? CircularProgressIndicator()
-            : currentNode == null
-                ? ElevatedButton(
-                    onPressed: () => _startStory(context),
-                    child: Text('Start Story'),
-                  )
-                : Column(
-                    children: [
-                      Expanded(
-                        child: ListView.builder(
-                          padding: EdgeInsets.all(8.0),
-                          itemCount: visitedNodes.length,
-                          itemBuilder: (context, index) {
-                            final node = visitedNodes[index];
-                            return _buildStoryNode(node);
-                          },
+          child: isLoading
+              ? CircularProgressIndicator()
+              : currentNode == null
+                  ? ElevatedButton(
+                      onPressed: () => _startStory(context),
+                      child: Text('Start Story'),
+                    )
+                  : Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Positioned.fill(
+                          child: ColorFiltered(
+                            colorFilter: ColorFilter.mode(
+                              Colors.grey.withOpacity(isRolling ? 0.5 : 0.0),
+                              BlendMode.saturation,
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Expanded(
+                                    child: Stack(
+                                  children: [
+                                    ListView.builder(
+                                      padding: EdgeInsets.all(8.0),
+                                      itemCount: visitedNodes.length,
+                                      itemBuilder: (context, index) {
+                                        final node = visitedNodes[index];
+                                        return _buildStoryNode(node);
+                                      },
+                                    ),
+                                    if (isRolling)
+                                      Container(
+                                        color: Colors.grey.withOpacity(0.5),
+                                      ),
+                                  ],
+                                )),
+                                if (currentNode?.edges != null &&
+                                    currentNode!.edges!.isNotEmpty &&
+                                    currentNode!.edges!.every((edge) =>
+                                        edge.metadata?.contains('Action') ==
+                                        true))
+                                  Wrap(
+                                    spacing: 8.0,
+                                    children: currentNode!.edges!.map((edge) {
+                                      if (edge.child != null) {
+                                        return _buildStoryNode(edge.child!,
+                                            onTouched: () =>
+                                                _traverseEdge(edge),
+                                            color: edge.metadata!
+                                                    .contains('caution')
+                                                ? Color.fromARGB(
+                                                    255, 82, 152, 185)
+                                                : Color.fromARGB(
+                                                    255, 197, 97, 97),
+                                            showBottomLine: false);
+                                      } else {
+                                        return _buildStoryNode(
+                                          Node(
+                                              description:
+                                                  'Missing child node'),
+                                        );
+                                      }
+                                    }).toList(),
+                                  ),
+                                if (storyEnded)
+                                  ElevatedButton(
+                                      onPressed: () => _restartStory(context),
+                                      child: Text('Story Ended, Restart Story'))
+                              ],
+                            ),
+                          ),
                         ),
-                      ),
-                      if (currentNode?.edges != null &&
-                          currentNode!.edges!.isNotEmpty &&
-                          currentNode!.edges!.every((edge) => edge.metadata?.contains('Action') == true))
-                        Wrap(
-                          spacing: 8.0,
-                           children: currentNode!.edges!.map((edge) {
-                            if (edge.child != null) {
-                              return _buildStoryNode(edge.child!, onTouched: () => _traverseEdge(edge), color:edge.metadata!.contains('caution') ? Color.fromARGB(255, 82, 152, 185) : Color.fromARGB(255, 197, 97, 97));
-                            } else {
-                              return _buildStoryNode(
-                                Node(description: 'Missing child node'),
-                              );
-                            }
-                          }).toList(),
-                        ),
-                    ],
-                  ),
-      ),
+                        if (isRolling )
+                          FortuneWheel(key: UniqueKey(),desiredResult: spinResult),
+                        
+                      ],
+                    )),
     );
   }
 
-  Widget _buildStoryNode(Node node, {VoidCallback? onTouched, Color? color}) {
+  Widget _buildStoryNode(Node node,
+      {VoidCallback? onTouched,
+      Color? color,
+      showBottomLine = true,
+      String? outcomeDescription}) {
     return GestureDetector(
       onTap: onTouched,
       child: Container(
         margin: EdgeInsets.symmetric(vertical: 8.0),
         padding: EdgeInsets.all(12.0),
         decoration: BoxDecoration(
-          color: color ?? (onTouched != null ? Colors.lightBlue[50] : Colors.grey[200]),
+          color: color ??
+              (onTouched == null ? Color(0xff030810) : Colors.grey[200]),
           borderRadius: BorderRadius.circular(8.0),
+          border: showBottomLine
+              ? Border(bottom: BorderSide(color: Colors.white))
+              : null,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(node.description ?? ''),
+            if (outcomeDescription != null) Text(outcomeDescription!),
           ],
         ),
       ),
